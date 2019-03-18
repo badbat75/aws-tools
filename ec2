@@ -1,0 +1,72 @@
+#!/bin/bash
+
+if [ -f ec2.conf ]; then
+	source ec2.conf
+fi
+
+EC2_SSH_KEY=${EC2_SSH_KEY:-"defaultkey-pem"}
+EC2_USER=${EC2_USER:-"ubuntu"}
+
+unset IPADDR CONN_STATUS EC2_STATE
+
+if [ -z ${INSTANCE_IDS} ]; then
+	echo  "Error: no INSTANCE_IDS specified"
+	exit 1
+fi
+
+case ${1} in
+	start)
+		echo -n "Starting instance."
+		aws ec2 start-instances --instance-ids ${INSTANCE_IDS} --output=text > /dev/null
+		FIRSTLOOP=1
+		while [ "${IPADDR}" == "" ]
+		do
+			[ ${FIRSTLOOP} -ne 1 ] && sleep 2
+			IPADDR=$(aws ec2 describe-instances --instance-ids ${INSTANCE_IDS} --query 'Reservations[].Instances[].PublicIpAddress[]' --output=text)
+			echo -n "."
+			FIRSTLOOP=0
+		done
+		echo -n "IP: ${IPADDR} ."
+		FIRSTLOOP=1
+		while [ "${EC2_STATE}" != "running" ]
+		do
+			[ ${FIRSTLOOP} -ne 1 ] && sleep 2
+			EC2_STATE=$(aws ec2 describe-instances --instance-ids ${INSTANCE_IDS} --query 'Reservations[].Instances[].State[].Name[]' --output=text)
+			#echo "State: ${EC2_STATE}"
+			echo -n "."
+			FIRSTLOOP=0
+		done
+		echo "Started."
+		echo -n "Waiting for SSH get started."
+		FIRSTLOOP=1
+		while [ "${CONN_STATUS}" != "OK" ]
+		do
+			[ ${FIRSTLOOP} -ne 1 ] && sleep 2
+			CONN_STATUS="$(ssh -i ${EC2_SSH_KEY} -o StrictHostKeyChecking=no -o ConnectTimeout=1 ${EC2_USER}@${IPADDR} "echo OK" 2>/dev/null)"
+			echo -n "."
+			FIRSTLOOP=0
+		done
+		echo "Started."
+		echo
+		echo "ssh -i defaultkey-pem -o "StrictHostKeyChecking=no" ubuntu@${IPADDR}"
+	;;
+	stop)
+		echo -n "Stopping instance."
+		IPADDR=$(aws ec2 describe-instances --instance-ids ${INSTANCE_IDS} --query 'Reservations[].Instances[].PublicIpAddress[]' --output=text)
+		ssh -i ${EC2_SSH_KEY} -o "StrictHostKeyChecking=no" ${EC2_USER}@${IPADDR} "sudo poweroff" 2>/dev/null
+		FIRSTLOOP=1
+		while [ "${EC2_STATE}" != "stopped" ]
+		do
+			[ ${FIRSTLOOP} -ne 1 ] && sleep 2
+			EC2_STATE=$(aws ec2 describe-instances --instance-ids ${INSTANCE_IDS} --query 'Reservations[].Instances[].State[].Name[]' --output=text)
+			#echo "State: ${EC2_STATE}"
+			echo -n "."
+			FIRSTLOOP=0
+		done
+		echo "Stopped."
+	;;
+	*)
+		echo "Start or stop?"
+	;;
+esac
+

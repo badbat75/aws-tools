@@ -1,0 +1,3 @@
+EC2_SSH_KEY="defaultkey-pem"
+INSTANCE_IDS="<ec2-instance-id>"
+EC2_USER="<ubuntu or ec2-user>"
