@@ -63,19 +63,38 @@ function wait_for_ready () {
 		echo 
 }
 
+function ec2_run () {
+	echo -n "Creating instance "
+	AMIID=$(aws ec2 describe-images --filters "Name=is-public,Values=false" "Name=name, Values=${AMINAME}" --query Images[].ImageId[] --output=text)
+	#INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --block-device-mappings "[{\"DeviceName\":\"/dev/sdb\",\"Ebs\":{\"SnapshotId\":\"'${DATAVOLUMEID}'\"}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
+	#INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --block-device-mappings "[{\"DeviceName\":\"/dev/sdf\",\"Ebs\":{\"VolumeSize\":20,\"DeleteOnTermination\":true}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
+	INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
+	echo "${INSTANCE_IDS} ."
+	wait_for_ready
+	if [ ! -z ${RUNSCRIPT} ]
+	then
+		ssh -q -i ${EC2_SSH_KEY} -o StrictHostKeyChecking=no -o ConnectTimeout=1 ${EC2_USER}@${IPADDR} < ${RUNSCRIPT}
+	fi
+}
+
+function ec2_terminate () {
+	echo -n "Terminating instance."
+	aws ec2 terminate-instances --instance-ids ${INSTANCE_IDS} --output=text > /dev/null
+	FIRSTLOOP=1
+	while [ "${EC2_STATE}" != "terminated" ]
+	do
+		[ ${FIRSTLOOP} -ne 1 ] && sleep 2
+		EC2_STATE=$(aws ec2 describe-instances --instance-ids ${INSTANCE_IDS} --query 'Reservations[].Instances[].State[].Name[]' --output=text)
+		#echo "State: ${EC2_STATE}"
+		echo -n "."
+		FIRSTLOOP=0
+	done
+	echo "Terminated."
+}
+
 case ${EC2_CMD} in
 	run)
-		echo -n "Creating instance "
-		AMIID=$(aws ec2 describe-images --filters "Name=is-public,Values=false" "Name=name, Values=${AMINAME}" --query Images[].ImageId[] --output=text)
-		#INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --block-device-mappings "[{\"DeviceName\":\"/dev/sdb\",\"Ebs\":{\"SnapshotId\":\"'${DATAVOLUMEID}'\"}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
-		#INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --block-device-mappings "[{\"DeviceName\":\"/dev/sdf\",\"Ebs\":{\"VolumeSize\":20,\"DeleteOnTermination\":true}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
-		INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
-		echo "${INSTANCE_IDS} ."
-		wait_for_ready
-		if [ ! -z ${RUNSCRIPT} ]
-		then
-			ssh -q -i ${EC2_SSH_KEY} -o StrictHostKeyChecking=no -o ConnectTimeout=1 ${EC2_USER}@${IPADDR} < ${RUNSCRIPT}
-		fi
+		ec2_run
 	;;
 	start)
 		aws ec2 start-instances --instance-ids ${INSTANCE_IDS} --output=text > /dev/null
@@ -97,18 +116,23 @@ case ${EC2_CMD} in
 		echo "Stopped."
 	;;
 	terminate)
-		echo -n "Terminating instance."
-		aws ec2 terminate-instances --instance-ids ${INSTANCE_IDS} --output=text > /dev/null
-		FIRSTLOOP=1
-		while [ "${EC2_STATE}" != "terminated" ]
-		do
-			[ ${FIRSTLOOP} -ne 1 ] && sleep 2
-			EC2_STATE=$(aws ec2 describe-instances --instance-ids ${INSTANCE_IDS} --query 'Reservations[].Instances[].State[].Name[]' --output=text)
-			#echo "State: ${EC2_STATE}"
-			echo -n "."
-			FIRSTLOOP=0
-		done
-		echo "Terminated."
+		ec2_terminate
+	;;
+	batch)
+		if [ -f "${1}" ]
+		then
+			ec2_run
+			echo
+			echo "================ Running batch ================="
+			echo
+			ssh -q -i ${EC2_SSH_KEY} -o StrictHostKeyChecking=no -o ConnectTimeout=1 ${EC2_USER}@${IPADDR} < ${1}
+			echo
+			echo "================ End of batch =================="
+			echo
+			ec2_terminate
+		else
+			echo "No batch file specified."
+		fi
 	;;
 	*)
 		echo "run, start, stop or terminate?"
