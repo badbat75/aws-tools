@@ -1,9 +1,11 @@
-EC2_SSH_KEY="defaultkey-pem"
-INSTANCE_IDS="<ec2-instance-id>"
-EC2_USER="<ubuntu or ec2-user>"
+EC2_SSH_KEY="ireland_kp.pem"
+#INSTANCE_IDS="<ec2-instance-id>"
+EC2_USER="ubuntu"
 EC2_SSH_KEY_NAME="ireland_kp"
 
-INSTANCETYPE="a1.2xlarge"
-AMIID="ami-0ec71c2d85268e79b"
-DATAVOLUMEID="snap-089f983762145e173"
+INSTANCETYPE="a1.medium"
+#INSTANCETYPE="a1.2xlarge"
+AMINAME="Development Instance for ARM"
+DATAVOLUMEID="vol-096895750b735e5eb"
 SGIDs="sg-62bbf605 sg-0385aa386131ccafb"
+RUNSCRIPT=setup_instance.txt

@@ -1,8 +1,3 @@
-sudo apt update
-#sudo apt upgrade -y
-sudo mkfs -t xfs /dev/nvme1n1
-sudo mkdir -p /mnt/data
-sudo mount /dev/nvme1n1 /mnt/data
-sudo chown -R ubuntu:ubuntu /mnt/data
-cd /mnt/data
-git clone https://github.com/badbat75/bbbuild
+sudo mount /mnt/data
+cd /mnt/data/bbbuild
+git pull
