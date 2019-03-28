@@ -1,23 +1,28 @@
 #!/bin/bash
+CMD_PATH=$(dirname $(realpath ${0}))
 
-if [ -f ec2.conf ]; then
-	source ec2.conf
+if [ -f ${CMD_PATH}/ec2.conf ]; then
+	source ${CMD_PATH}/ec2.conf
 fi
 
 EC2_SSH_KEY=${EC2_SSH_KEY:-"defaultkey-pem"}
 EC2_USER=${EC2_USER:-"ubuntu"}
 
-unset IPADDR CONN_STATUS EC2_STATE
-
-if [ -z ${INSTANCE_IDS} ]; then
-	echo  "Error: no INSTANCE_IDS specified"
-	exit 1
+EC2_CMD=${1}
+shift
+if [ "${@}x" != "x" ]; then
+	INSTANCE_IDS=${@}
+else
+	if [ -z ${INSTANCE_IDS} ] && [ "x${EC2_CMD}" != "xrun" ]; then
+		echo  "Error: no INSTANCE_IDS specified"
+		exit 1
+	fi
 fi
 
-case ${1} in
-	start)
-		echo -n "Starting instance."
-		aws ec2 start-instances --instance-ids ${INSTANCE_IDS} --output=text > /dev/null
+unset IPADDR CONN_STATUS EC2_STATE
+
+function wait_for_ready () {
+		echo -n "Starting."
 		FIRSTLOOP=1
 		while [ "${IPADDR}" == "" ]
 		do
@@ -48,7 +53,19 @@ case ${1} in
 		done
 		echo "Started."
 		echo
-		echo "ssh -i defaultkey-pem -o "StrictHostKeyChecking=no" ubuntu@${IPADDR}"
+		echo "ssh -i ${EC2_SSH_KEY}  -o StrictHostKeyChecking=no ubuntu@${IPADDR}"
+}
+
+case ${EC2_CMD} in
+	run)
+		echo -n "Creating instance "
+		INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --block-device-mappings "[{\"DeviceName\":\"/dev/sdb\",\"Ebs\":{\"SnapshotId\":\"'${DATAVOLUMEID}'\"}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
+		echo "${INSTANCE_IDS} ."
+		wait_for_ready
+	;;
+	start)
+		aws ec2 start-instances --instance-ids ${INSTANCE_IDS} --output=text > /dev/null
+		wait_for_ready
 	;;
 	stop)
 		echo -n "Stopping instance."
@@ -65,8 +82,21 @@ case ${1} in
 		done
 		echo "Stopped."
 	;;
+	terminate)
+		echo -n "Terminating instance."
+		aws ec2 terminate-instances --instance-ids ${INSTANCE_IDS} --output=text > /dev/null
+		FIRSTLOOP=1
+		while [ "${EC2_STATE}" != "terminated" ]
+		do
+			[ ${FIRSTLOOP} -ne 1 ] && sleep 2
+			EC2_STATE=$(aws ec2 describe-instances --instance-ids ${INSTANCE_IDS} --query 'Reservations[].Instances[].State[].Name[]' --output=text)
+			#echo "State: ${EC2_STATE}"
+			echo -n "."
+			FIRSTLOOP=0
+		done
+		echo "Terminated."
+	;;
 	*)
-		echo "Start or stop?"
+		echo "run, start, stop or terminate?"
 	;;
 esac
-
