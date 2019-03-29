@@ -1,0 +1,4 @@
+cd /mnt/data/bbbuild && 
+git pull &&
+find images -exec ./publish_fsarchive {} \; &&
+sudo poweroff

@@ -68,7 +68,7 @@ function ec2_run () {
 	AMIID=$(aws ec2 describe-images --filters "Name=is-public,Values=false" "Name=name, Values=${AMINAME}" --query Images[].ImageId[] --output=text)
 	#INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --block-device-mappings "[{\"DeviceName\":\"/dev/sdb\",\"Ebs\":{\"SnapshotId\":\"'${DATAVOLUMEID}'\"}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
 	#INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --block-device-mappings "[{\"DeviceName\":\"/dev/sdf\",\"Ebs\":{\"VolumeSize\":20,\"DeleteOnTermination\":true}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
-	INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
+	INSTANCE_IDS=$(eval 'aws ec2 run-instances --image-id '${AMIID}' --count 1 --instance-type '${INSTANCETYPE}' --key-name '${EC2_SSH_KEY_NAME}' --security-group-ids '${SGIDs}' '${IAMPROFILE:+--iam-instance-profile Name=${IAMPROFILE}}' --tag-specifications "ResourceType=instance,Tags=[{Key=build,Value=arm}]" --query "Instances[].InstanceId[]" --output=text')
 	echo "${INSTANCE_IDS} ."
 	wait_for_ready
 	if [ ! -z ${RUNSCRIPT} ]
