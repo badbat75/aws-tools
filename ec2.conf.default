@@ -3,9 +3,10 @@ EC2_SSH_KEY="ireland_kp.pem"
 EC2_USER="ubuntu"
 EC2_SSH_KEY_NAME="ireland_kp"
 
-INSTANCETYPE="a1.medium"
-#INSTANCETYPE="a1.2xlarge"
+#INSTANCETYPE="a1.medium"
+INSTANCETYPE="a1.2xlarge"
 AMINAME="Development Instance for ARM"
 DATAVOLUMEID="vol-096895750b735e5eb"
 SGIDs="sg-62bbf605 sg-0385aa386131ccafb"
+IAMPROFILE="bbb-build-artifacts_from_ec2"
 RUNSCRIPT=setup_instance.txt
