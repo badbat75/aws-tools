@@ -1,5 +1,5 @@
 cd /mnt/data/bbbuild && 
 git pull &&
-./bbbuilder moode-empty-prod &&
+./bbbuilder moode-r53-empty-prod &&
 find images -name '*.img' -exec ./publish_image {} \; &&
 sudo poweroff
