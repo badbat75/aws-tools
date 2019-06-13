@@ -1,0 +1,5 @@
+cd /mnt/data/bbbuild && 
+git pull &&
+./bbbuilder moode-r53-empty-dev &&
+find images -exec ./publish_fsarchive {} \; &&
+sudo poweroff
